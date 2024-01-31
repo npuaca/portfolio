@@ -16,8 +16,8 @@ library(glmnet)
 #importing
 ```{r}
 #load data and turn factors into factors 
-train <- read.csv("C:/Users/Bart/Desktop/Customer Behavior Data/train.csv")
-#train <- read.csv("~/Downloads/train.csv")
+train <- read.csv("C:/Users/nenad/Desktop/Homework/University/5A/STAT 488/#Project/train.csv")
+
 
 
 train$type_of_meal_plan <- as.factor(train$type_of_meal_plan)
@@ -215,7 +215,7 @@ total <- append(total, test_accuracy)
 
 
 ```{r}
-#write.csv(ntree_tracker,"C:/Users/Bart/Desktop/RF_treecounter.csv" ,row.names=FALSE)
+#write.csv(ntree_tracker,"C:/Users/nenad/Desktop/Homework/University/5A/STAT 488/#Project/RF_treecounter.csv" ,row.names=FALSE)
 #saving the tracker copy data as a csv
 
 #initial model was 500 trees, so we tried 1:50 and saw accuracy rate increasing
@@ -265,7 +265,7 @@ test_accuracy
 
 #boosted model via Xgboost
 ```{r}
-#boosted<- xgboost(booking_status~.-id, data="C:/Users/Bart/Desktop/Customer Behavior Data/train.csv", params = #list=(eta = 0.01), nrounds=5)
+#boosted<- xgboost(booking_status~.-id, data="C:/Users/nenad/Desktop/Homework/University/5A/STAT 488/#Project/train.csv", params = #list=(eta = 0.01), nrounds=5)
 
 #boosted
 #summary(boosted)
@@ -274,7 +274,7 @@ test_accuracy
 
 #final predictions
 ```{r}
-test <- read.csv("C:/Users/Bart/Downloads/test.csv")
+test <- read.csv("C:/Users/nenad/Desktop/Homework/University/5A/STAT 488/#Project/test.csv")
 
 
 test$type_of_meal_plan <- as.factor(test$type_of_meal_plan)
@@ -293,8 +293,8 @@ test <- test[-1]
 #re-importing
 ```{r}
 #load data and turn factors into factors 
-train <- read.csv("C:/Users/Bart/Desktop/Customer Behavior Data/train.csv")
-#train <- read.csv("~/Downloads/train.csv")
+train <- read.csv("C:/Users/nenad/Desktop/Homework/University/5A/STAT 488/#Project/train.csv")
+
 
 
 train$type_of_meal_plan <- as.factor(train$type_of_meal_plan)
@@ -320,10 +320,9 @@ train$booking_status <- as.factor(train$booking_status)
 
 #test$booking_status <- booking_status
 
-#write.csv(final_pred_df, "C:/Users/Bart/Desktop/final_predictions_351_2.csv", row.names=FALSE)
+#write.csv(final_pred_df, "C:/Users/nenad/Desktop/Homework/University/5A/STAT 488/#Project/final_predictions_351_2.csv", row.names=FALSE)
 
 ```
-
 
 
 
