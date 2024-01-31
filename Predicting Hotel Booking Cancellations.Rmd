@@ -1,0 +1,332 @@
+---
+title: "Project"
+author: "Bart Ryczek"
+date: "4/16/2023"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(tree)
+library(randomForest)
+library(gbm)
+library(glmnet)
+```
+
+#importing
+```{r}
+#load data and turn factors into factors 
+train <- read.csv("C:/Users/Bart/Desktop/Customer Behavior Data/train.csv")
+#train <- read.csv("~/Downloads/train.csv")
+
+
+train$type_of_meal_plan <- as.factor(train$type_of_meal_plan)
+train$required_car_parking_space <- as.factor(train$required_car_parking_space)
+train$room_type_reserved <- as.factor(train$room_type_reserved)
+train$market_segment_type <- as.factor(train$market_segment_type)
+train$repeated_guest <- as.factor(train$repeated_guest)
+
+#train$big_group <- with(train, ifelse(no_of_adults+no_of_children > 3, 1, 0))
+#train$big_group <- as.factor(train$big_group)
+
+
+
+#train$family <- with(train, ifelse(no_of_children > 0, 1, 0))
+#train$family <- as.factor(train$family)
+
+train$booking_status <- as.factor(train$booking_status)
+```
+
+#whole model same as the reduced
+```{r}
+classic_tree <- tree(booking_status ~ ., data=train)
+classic_tree
+plot(classic_tree)
+text(classic_tree, pretty = 0)
+title(main = " Classification Tree")
+```
+
+
+#reduced
+```{r}
+classic_tree <- tree(booking_status ~ lead_time + arrival_month + arrival_date + market_segment_type +  avg_price_per_room +no_of_special_requests, data=train)
+classic_tree
+plot(classic_tree)
+text(classic_tree, pretty = 0)
+title(main = " Classification Tree")
+```
+```{r}
+xicount <- c(2:9)
+k_MSE <- c()
+
+index<-sample(1:nrow(train))
+groups<-cut(1:nrow(train),5,labels=FALSE)
+folds<-split(index,groups)
+
+
+for (j in 1:5){
+for (i in 2:9){
+  
+  
+  test_data_answer <- train[unlist(folds[j]), 19]
+  test_data <- train[unlist(folds[j]), 2:18]
+  train_data <- train[-unlist(folds[j]), 2:19]
+  
+  
+  temptree <- tree(booking_status ~. , data=train_data)
+  temptree_prune <- prune.tree(temptree, best = i)
+  
+  temppreds <-  predict(temptree_prune, newdata = test_data, type="class")
+  tempaccuracy <- sum(diag(table(predicted = temppreds, true = test_data_answer)))/8420
+  
+  k_MSE <- append(k_MSE,tempaccuracy)
+  
+  
+}
+}
+xicount
+k_MSE
+
+max(k_MSE)
+```
+
+
+
+
+
+#into matrix for other purposes
+```{r}
+new_mat <- apply(as.matrix(train), 2, as.numeric)
+
+new_mat["type_of_meal_plan"] = as.factor(new_mat["type_of_meal_plan"])
+new_mat["required_car_parking_space"] = as.factor(new_mat["required_car_parking_space"])
+new_mat["room_type_reserved"] = as.factor(new_mat["room_type_reserved"])
+new_mat["market_segment_type"] = as.factor(new_mat["market_segment_type"])
+new_mat["repeated_guest"] = as.factor(new_mat["repeated_guest"])
+```
+
+#Variable selection
+```{r}
+x <- model.matrix(booking_status ~. , data = train)[, -1]
+y <- as.matrix(train$booking_status)
+
+grid <- 10^seq(10, -2, length = 100)
+
+train2 <- sample(1:nrow(x), nrow(x) / 2) 
+test <- (-train2)
+y.test <- y[test]
+
+
+
+lasso.mod <- glmnet(x[train2, ], y[train2], alpha = 1, lambda = grid)
+plot(lasso.mod)
+
+#perform k-fold cross-validation to find optimal lambda value
+
+cv.out <- cv.glmnet(x[train2, ], y[train2], alpha = 1, family = "binomial")
+plot(cv.out)
+
+bestlam <- cv.out$lambda.min
+
+
+#newest good model
+lasso.mod2 <- glmnet(x[train2, ], y[train2], alpha = 1, lambda = bestlam)
+lasso.coef <- predict(lasso.mod2, type ="coefficients", s = bestlam)
+lasso.coef
+```
+
+#Based on penalized regression being used for variable selection, 
+#the variables dropped were num of weeknights, arrival month.
+#All other variables were included in the model, but all had
+#very low coefficients, meaning the lasso was largely inconclusive 
+#for variable selection
+
+
+
+
+#random forest
+```{r}
+model<-randomForest(booking_status~.-id,data=train,importance=TRUE, ntree = 300)
+
+importance(model)
+sort(importance(model))
+```
+#using good enough average amount of trees, as well as using the lasso
+#it appeared both models were in agreement on market segment but the variable that had the largest decrease was lead_time, but overall there where lots
+
+#of contradictions within the model, thus this wasn't a good fit for 
+#variable selection
+
+
+
+#boosted model
+```{r}
+boosted<- gbm(booking_status~.-id, data=train, n.trees = 1000, shrinkage = 0.01, distribution = "bernoulli")
+
+boosted
+```
+
+
+
+
+
+#K-Fold Cross Validation RANDOM FOREST (K=5)
+```{r}
+index<-sample(1:nrow(train))
+groups<-cut(1:nrow(train),5,labels=FALSE)
+folds<-split(index,groups)
+
+
+total <- c()
+k_MSE <- c()
+tens <- c(210,220, 230, 240, 250, 260, 270, 280, 290, 300)
+
+#for (j in tens){
+for (i in 1:5){
+  test_data_answer <- train[unlist(folds[i]), 19]
+  test_data <- train[unlist(folds[i]), 2:18]
+  train_data <- train[-unlist(folds[i]), 2:19]
+  
+  #RF
+  temp_model <- randomForest(booking_status~., data=train_data, ntree = 300)
+  temp_preds <- predict(temp_model, newdata = test_data)
+  
+  #accuracy measuring
+  correct_preds <- sum(diag(table(pred = temp_preds, true = test_data_answer)))
+  total_preds <- sum((table(pred = temp_preds, true = test_data_answer)))
+  
+  #append to K MSE vector
+  accuracy <- correct_preds/total_preds
+  
+  k_MSE <- append(k_MSE,accuracy)
+  
+}
+
+test_accuracy <- mean(k_MSE)
+
+
+
+total <- append(total, test_accuracy)
+
+#}
+#TEST ACCURACY OF THIS RANDOM FOREST with Ntree testing
+```
+
+
+
+```{r}
+#write.csv(ntree_tracker,"C:/Users/Bart/Desktop/RF_treecounter.csv" ,row.names=FALSE)
+#saving the tracker copy data as a csv
+
+#initial model was 500 trees, so we tried 1:50 and saw accuracy rate increasing
+#due to computational expenses we had to cut back on the amount of trees, so we used intervals of 10
+#100, 110, ..., 200 saw the beginning of a plateuo
+#210, 220, ..., 300saw similar ~81% accuracy rating
+```
+
+
+#K-Fold Cross Validation BOOSTED MODEL (K=5)
+```{r}
+index<-sample(1:nrow(train))
+groups<-cut(1:nrow(train),5,labels=FALSE)
+folds<-split(index,groups)
+
+
+k_MSE_2 <- c()
+
+for (i in 1:5){
+  test_data_answer <- train[unlist(folds[i]), 19]
+  test_data <- train[unlist(folds[i]), 2:18]
+  train_data <- train[-unlist(folds[i]), 2:19]
+  
+  #Boosted
+  temp_model <- gbm(booking_status~., data=train_data, n.trees = 1000, shrinkage = 0.01, distribution = "bernoulli")
+  temp_preds <- predict(temp_model, newdata = test_data, type="response")
+  
+  #accuracy measuring
+  correct_preds <- sum(diag(table(pred = temp_preds, true = test_data_answer)))
+  total_preds <- sum((table(pred = temp_preds, true = test_data_answer)))
+  
+  #append to K MSE vector
+  accuracy <- correct_preds/total_preds
+  
+  k_MSE_2 <- append(k_MSE_2,accuracy)
+  
+}
+
+
+
+test_accuracy <- mean(k_MSE_2)
+
+
+test_accuracy
+#TEST ACCURACY OF THIS GBM MODEL
+```
+
+#boosted model via Xgboost
+```{r}
+#boosted<- xgboost(booking_status~.-id, data="C:/Users/Bart/Desktop/Customer Behavior Data/train.csv", params = #list=(eta = 0.01), nrounds=5)
+
+#boosted
+#summary(boosted)
+```
+
+
+#final predictions
+```{r}
+test <- read.csv("C:/Users/Bart/Downloads/test.csv")
+
+
+test$type_of_meal_plan <- as.factor(test$type_of_meal_plan)
+test$required_car_parking_space <- as.factor(test$required_car_parking_space)
+test$room_type_reserved <- as.factor(test$room_type_reserved)
+test$market_segment_type <- as.factor(test$market_segment_type)
+test$repeated_guest <- as.factor(test$repeated_guest)
+
+test <- test[-1]
+```
+
+
+
+
+
+#re-importing
+```{r}
+#load data and turn factors into factors 
+train <- read.csv("C:/Users/Bart/Desktop/Customer Behavior Data/train.csv")
+#train <- read.csv("~/Downloads/train.csv")
+
+
+train$type_of_meal_plan <- as.factor(train$type_of_meal_plan)
+train$required_car_parking_space <- as.factor(train$required_car_parking_space)
+train$room_type_reserved <- as.factor(train$room_type_reserved)
+train$market_segment_type <- as.factor(train$market_segment_type)
+train$repeated_guest <- as.factor(train$repeated_guest)
+
+
+train <- train[-1]
+
+train$booking_status <- as.factor(train$booking_status)
+```
+
+
+```{r}
+#final_model <-randomForest(booking_status~.,data=train, ntree = 300)
+#booking_status <- predict(final_model, newdata = test)
+
+#id <- c(42100:70167)
+
+#final_pred_df <- data.frame(id, booking_status)
+
+#test$booking_status <- booking_status
+
+#write.csv(final_pred_df, "C:/Users/Bart/Desktop/final_predictions_351_2.csv", row.names=FALSE)
+
+```
+
+
+
+
+
+
