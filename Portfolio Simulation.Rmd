@@ -1,0 +1,86 @@
+---
+title: "Portfolio Returns Simulation"
+author: "Nenad Puaca"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+
+# Inputs
+prtf_n0 <- 1e3
+inflation_rate <- 0.02
+nsim <- 10000
+nyears <- 20 
+brkr <- 100
+
+# Define asset class, return, volatility, and allocation percentages
+assets <- c("CD", "Money Market", "Bonds", "Stocks", "Crypto")
+volatilities <- c(0, 0.05, 0.09, 0.23, 0.66)
+allocation <- c(0, 0.1, 0.1, 0.3, 0.5)
+
+# Create an empty matrix to store simulation results
+portfolio_values <- matrix(0, nrow = nsim, ncol = nyears + 1)
+
+# Set seed
+set.seed(123)
+
+# Run the simulations
+for (i in 1:nsim) {
+  portfolio_value <- rep(prtf_n0, nyears + 1)
+  
+  for (j in 1:nyears) {
+    if (j == 1) {
+      portfolio_value[j] <- prtf_n0
+    } else {
+      # Update portfolio value based on returns, volatilities, and inflation
+      CD_return <- allocation[1] * portfolio_value[j-1]
+      MM_return <- (rnorm(1, mean = 0, sd = volatilities[2]) + 1) * (allocation[2] * portfolio_value[j-1])
+      BD_return <- (rnorm(1, mean = 0, sd = volatilities[3]) + 1) * (allocation[3] * portfolio_value[j-1])
+      ST_return <- (rnorm(1, mean = 0, sd = volatilities[5]) + 1) * (allocation[4] * portfolio_value[j-1])
+      CR_return <- (rnorm(1, mean = 0, sd = volatilities[5]) + 1) * (allocation[5] * portfolio_value[j-1])
+      
+      portfolio_value[j] <- sum(CD_return, MM_return, BD_return, ST_return, CR_return)
+      portfolio_value[j] <- portfolio_value[j] * (1 - inflation_rate) - brkr
+    }
+  }
+  
+  # Update the last year's portfolio value using the updated previous year's value
+  CD_return <- allocation[1] * portfolio_value[nyears]
+  MM_return <- (rnorm(1, mean = 0, sd = volatilities[2]) + 1) * (allocation[2] * portfolio_value[nyears])
+  BD_return <- (rnorm(1, mean = 0, sd = volatilities[3]) + 1) * (allocation[3] * portfolio_value[nyears])
+  ST_return <- (rnorm(1, mean = 0, sd = volatilities[5]) + 1) * (allocation[4] * portfolio_value[nyears])
+  CR_return <- (rnorm(1, mean = 0, sd = volatilities[5]) + 1) * (allocation[5] * portfolio_value[nyears])
+
+  portfolio_value[nyears + 1] <- sum(CD_return, MM_return, BD_return, ST_return, CR_return)
+  portfolio_value[nyears + 1] <- portfolio_value[nyears + 1] * (1 - inflation_rate) - brkr
+  
+  portfolio_values[i, ] <- portfolio_value
+}
+
+# Create a data frame with simulation results
+simulations <- data.frame(Year = rep(0:nyears, nsim), 
+                          Value = as.vector(t(portfolio_values)))
+
+# Determine the probability of doubling the portfolio
+prob_2x <- sum(portfolio_values[, nyears] >= (2 * prtf_n0)) / nsim * 100
+
+# Determine the probability of going bust
+prob_bust <- sum(portfolio_values[, nyears] <= 0) / nsim * 100
+
+# Plot the simulation results
+ggplot(simulations, aes(x = Year, y = Value, group = rep(1:nsim, each = nyears + 1))) +
+  geom_path(alpha = 0.25, color = 'red', size = 0.1) +
+  labs(x = "Year", y = "Portfolio Value", color = "Simulation") +
+  ggtitle("Portfolio Performance Simulation") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Show the probabilities
+cat("Probability of doubling the portfolio is", prob_2x, "%\n")
+cat("Probability of losing all portfolio value is", prob_bust, "%\n")
+
+```
+
+
