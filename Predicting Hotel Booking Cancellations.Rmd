@@ -1,9 +1,8 @@
 ---
 title: "Project"
-author: "Bart Ryczek"
-date: "4/16/2023"
+author: "Nenad Puaca"
+date: "8/10/2023"
 output:
-  pdf_document: default
   html_document: default
 ---
 
